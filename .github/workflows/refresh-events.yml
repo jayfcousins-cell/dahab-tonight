@@ -1,0 +1,35 @@
+name: Refresh Dahab events
+
+on:
+  schedule:
+    - cron: '20 3 * * *'      # daily 03:20 UTC (~05:20 Dahab) - before anyone opens the app
+  workflow_dispatch:           # and a manual "Run workflow" button
+
+permissions:
+  contents: write              # only needs to commit events.json; no secrets, no deploy keys
+
+concurrency:
+  group: refresh-events
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Ingest events from dailydahab.com
+        run: node ingest.js
+      - name: Commit if changed
+        run: |
+          git config user.name  "dahab-tonight-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add events.json
+          if git diff --staged --quiet; then
+            echo "No change to events.json"
+          else
+            git commit -m "chore: refresh events $(date -u +%Y-%m-%d)"
+            git push
+          fi

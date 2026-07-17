@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The shared demand board. Readable by anyone (that is the point of a
+    // public board). Writes require an anonymous sign-in and are shape-checked,
+    // so a passer-by cannot rewrite someone else's proposal.
+    match /proposals/{id} {
+      allow read: if true;
+
+      allow create: if request.auth != null
+                    && request.resource.data.t is string
+                    && request.resource.data.t.size() > 0
+                    && request.resource.data.t.size() < 140
+                    && request.resource.data.want is int
+                    && request.resource.data.want >= 0
+                    && request.resource.data.need is int
+                    && (!('cover' in request.resource.data) || request.resource.data.cover == null
+                        || request.resource.data.cover.size() < 700000);
+
+      // backing a proposal / answering the pay + frequency form may only ever
+      // touch the tally fields, never the title, date, photo or author
+      allow update: if request.auth != null
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['want','payYes','freq']);
+
+      allow delete: if false;   // stewards delete from the console, not the app
+    }
+  }
+}
